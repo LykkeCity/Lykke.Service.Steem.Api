@@ -1,0 +1,104 @@
+import { JsonController, Get, Param, QueryParam, Post, Delete, OnUndefined } from "routing-controllers";
+import { BalanceRepository } from "../domain/balances";
+import { AssetRepository } from "../domain/assets";
+import { SteemService } from "../services/steemService";
+import { ConflictError } from "../errors/conflictError";
+import { BlockchainError } from "../errors/blockchainError";
+import { QueryParamIsPositiveInteger, ParamIsSteemAddress } from "../common";
+
+@JsonController("/balances")
+export class BalancesController {
+
+    constructor(
+        private assetRepository: AssetRepository,
+        private balanceRepository: BalanceRepository,
+        private steemService: SteemService) {
+    }
+
+    @Get()
+    async balances(
+        @QueryParamIsPositiveInteger("take") take: number,
+        @QueryParam("continuation") continuation?: string) {
+
+        if (!this.balanceRepository.validateContinuation(continuation)) {
+            throw new BlockchainError({ status: 400, message: "Query parameter [continuation] is invalid" });
+        }
+
+        const block = (await this.steemService.getLastIrreversibleBlockNumber()) * 10;
+        let items: any[] = [];
+
+        // CosmosDB doesn't suppport multiple $match-es in public preview version,
+        // so we can't filter out zero balances on server.
+        // Instead we have to set non-zero balances incrementally
+        // to return exactly [take] number of items
+
+        do {
+            const result = await this.balanceRepository.get(take, continuation);
+
+            continuation = result.continuation;
+
+            for (const e of result.items) {
+                if (e.AmountInBaseUnit > 0) {
+                    items.push({
+                        address: e._id.Address,
+                        assetId: e._id.AssetId,
+                        balance: e.AmountInBaseUnit.toFixed(),
+                        block: Math.max(e.Block, block)
+                    });
+                    take--;
+                }
+            }
+
+        } while (take > 0 && !!continuation)
+
+        return {
+            continuation,
+            items
+        };
+    }
+
+    @Get("/:address/:assetId")
+    async balanceOf(
+        @ParamIsSteemAddress("address") address: string,
+        @Param("assetId") assetId: string) {
+
+        const asset = await this.assetRepository.get(assetId);
+        if (asset == null) {
+            throw new BlockchainError({ status: 400, message: `Unknown assetId [${assetId}]` });
+        }
+
+        const block = await this.steemService.getLastIrreversibleBlockNumber();
+        const value = await this.balanceRepository.get(address, assetId);
+
+        if (!!value) {
+            return {
+                address: address,
+                assetId: assetId,
+                balance: value.AmountInBaseUnit.toFixed(),
+                block: block
+            };
+        } else {
+            return null;
+        }
+    }
+
+    @Post("/:address/observation")
+    @OnUndefined(200)
+    async observe(@ParamIsSteemAddress("address") address: string) {
+        if (await this.balanceRepository.isObservable(address)) {
+            throw new ConflictError(`Address [${address}] is already observed`);
+        } else {
+            await this.balanceRepository.observe(address);
+        }
+    }
+
+    @Delete("/:address/observation")
+    @OnUndefined(200)
+    async deleteObservation(@ParamIsSteemAddress("address") address: string): Promise<any> {
+        if (await this.balanceRepository.isObservable(address)) {
+            await this.balanceRepository.remove(address);
+        } else {
+            return null;
+        }
+    }
+}

@@ -1,0 +1,29 @@
+{
+  "name": "Lykke.Service.Steem.Api",
+  "version": "1.0.0",
+  "description": "STEEM blockchain integration, main API",
+  "main": "./build/server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Lykke",
+  "license": "ISC",
+  "dependencies": {
+    "@types/koa": "^2.0.46",
+    "@types/koa-bodyparser": "^4.2.0",
+    "@types/koa-router": "^7.0.30",
+    "@types/mongodb": "^3.1.1",
+    "@types/node": "^10.5.1",
+    "axios": "^0.18.0",
+    "azure-storage": "^2.10.0",
+    "koa": "^2.5.1",
+    "koa-bodyparser": "^4.2.1",
+    "koa-multer": "^1.0.2",
+    "koa-router": "^7.4.0",
+    "mongodb": "^3.1.0",
+    "reflect-metadata": "^0.1.12",
+    "routing-controllers": "^0.7.7",
+    "steem": "^0.7.1",
+    "typedi": "^0.7.3"
+  }
+}
