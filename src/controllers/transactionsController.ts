@@ -200,7 +200,7 @@ export class TransactionsController {
                 const from = this.getAccount(action.fromAddress);
                 const to = this.getAccount(action.toAddress);
                 const assetAmount = `${amount.toFixed(asset.Accuracy)} ${asset.AssetId}`;
-                const memo = action.toAddress.split(ADDRESS_SEPARATOR)[1];
+                const memo = action.toAddress.split(ADDRESS_SEPARATOR)[1] || "";
                 balanceInBaseUnit = asset.toBaseUnit(
                     await this.steemService.getBalance(from, asset.AssetId)
                 );
