@@ -111,8 +111,8 @@ export class OperationRepository extends AzureRepository {
 
     async upsert(operationId: string, type: OperationType, assetId: string,
         actions: { fromAddress: string, toAddress: string, amount: number, amountInBaseUnit: number }[],
-        expiryTime: Date) {
-
+        expiryTime?: Date) {
+        
         const operationEntity = new OperationEntity();
         operationEntity.PartitionKey = operationId;
         operationEntity.RowKey = "";
@@ -134,13 +134,15 @@ export class OperationRepository extends AzureRepository {
             return entity;
         });
 
-        const operationByExpiryTimeEntity = new OperationByExpiryTimeEntity();
-        operationByExpiryTimeEntity.PartitionKey = expiryTime.toISOString();
-        operationByExpiryTimeEntity.RowKey = operationId;
-
         await this.insertOrMerge(this.operationTableName, operationEntity);
         await this.insertOrMerge(this.operationActionTableName, operationActionEntities);
-        await this.insertOrMerge(this.operationByExpiryTimeTableName, operationByExpiryTimeEntity);
+
+        if (!!expiryTime) {
+            const operationByExpiryTimeEntity = new OperationByExpiryTimeEntity();
+            operationByExpiryTimeEntity.PartitionKey = expiryTime.toISOString();
+            operationByExpiryTimeEntity.RowKey = operationId;
+            await this.insertOrMerge(this.operationByExpiryTimeTableName, operationByExpiryTimeEntity);
+        }
     }
 
     async update(

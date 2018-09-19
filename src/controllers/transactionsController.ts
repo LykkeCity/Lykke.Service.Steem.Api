@@ -220,7 +220,7 @@ export class TransactionsController {
             tx: !!txActions.length && await this.steemService.prepareTransaction(txActions)
         };
 
-        await this.operationRepository.upsert(operationId, type, assetId, opActions, isoUTC(context.tx.expiration));
+        await this.operationRepository.upsert(operationId, type, assetId, opActions, context.tx && isoUTC(context.tx.expiration));
 
         return {
             transactionContext: toBase64(context)
