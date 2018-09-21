@@ -7,7 +7,7 @@ import { loadSettings, Settings, startAppInsights } from "./common";
 // must go first, before any other action 
 useContainer(Container);
 
-startAppInsights()
+startAppInsights();
 
 loadSettings()
     .then(settings => {

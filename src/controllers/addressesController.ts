@@ -1,11 +1,12 @@
 import { JsonController, Get, Param } from "routing-controllers";
 import { NotImplementedError } from "../errors/notImplementedError";
-import { isSteemAddress, ParamIsSteemAddress } from "../common";
+import { isSteemAddress, ParamIsSteemAddress, ADDRESS_SEPARATOR } from "../common";
+import { SteemService } from "../services/steemService";
 
 @JsonController("/addresses")
 export class AddressesController {
 
-    constructor() {
+    constructor(private steemService: SteemService) {
     }
 
     @Get("/:address/explorer-url")
@@ -14,9 +15,10 @@ export class AddressesController {
     }
 
     @Get("/:address/validity")
-    isValid(@Param("address") address: string) {
+    async isValid(@Param("address") address: string) {
         return {
-            isValid: isSteemAddress(address)
+            isValid: isSteemAddress(address) &&
+                await this.steemService.accountExists(address.split(ADDRESS_SEPARATOR)[0])
         };
     }
 }

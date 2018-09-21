@@ -42,6 +42,11 @@ export class SteemService {
         return trx;
     }
 
+    async accountExists(account: string): Promise<boolean> {
+        const accounts = await steem.api.getAccountsAsync([account]);
+        return !!accounts && !!accounts.length;
+    }
+
     async getConfig(): Promise<Config> {
         const config = await steem.api.getConfigAsync();
         return {
@@ -58,7 +63,7 @@ export class SteemService {
         const parseAmount = (asset: string) => parseFloat(asset.split(" ")[0]) || 0;
         const accounts = await steem.api.getAccountsAsync([account]);
 
-        if (!!accounts || !!accounts.length) {
+        if (!!accounts && !!accounts.length) {
             switch (assetId) {
                 case "SBD":
                 case "TBD":
