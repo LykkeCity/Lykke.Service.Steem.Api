@@ -81,9 +81,8 @@ export class SteemService {
         }
     }
 
-    async send(tx: SignedTransaction): Promise<string> {
+    async send(tx: SignedTransaction) {
         await steem.api.broadcastTransactionAsync(tx);
-        return this.getTransactionId(tx);
     }
 
     async generateKeys(name: string, password: string) {
