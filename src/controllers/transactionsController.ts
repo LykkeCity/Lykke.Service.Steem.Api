@@ -165,12 +165,12 @@ export class TransactionsController {
     private async build(type: OperationType, operationId: string, assetId: string, inOut: { fromAddress: string, toAddress: string, amount: string }[]) {
         const operation = await this.operationRepository.get(operationId);
         if (!!operation && operation.isRunning) {
-            throw new BlockchainError({ status: 409, message: `Operation [${operationId}] already ${this.getState(operation)}` });
+            throw new BlockchainError(409, `Operation [${operationId}] already ${this.getState(operation)}`);
         }
 
         const asset = await this.assetRepository.get(assetId);
         if (asset == null) {
-            throw new BlockchainError({ status: 400, message: `Unknown asset [${assetId}]` });
+            throw new BlockchainError(400, `Unknown asset [${assetId}]`);
         }
 
         const opActions = [];
@@ -180,7 +180,7 @@ export class TransactionsController {
             const amountInBaseUnit = parseInt(action.amount);
 
             if (Number.isNaN(amountInBaseUnit) || amountInBaseUnit <= 0) {
-                throw new BlockchainError({ status: 400, message: `Invalid amount [${action.amount}]` });
+                throw new BlockchainError(400, `Invalid amount [${action.amount}]`);
             }
 
             const amount = asset.fromBaseUnit(amountInBaseUnit);
@@ -211,7 +211,7 @@ export class TransactionsController {
             }
 
             if (balanceInBaseUnit < amountInBaseUnit) {
-                throw new BlockchainError({ status: 400, message: `Not enough balance on address [${action.fromAddress}]`, errorCode: ErrorCode.notEnoughBalance });
+                throw new BlockchainError(400, `Not enough balance on address [${action.fromAddress}]`, ErrorCode.notEnoughBalance);
             }
         }
 
@@ -278,13 +278,13 @@ export class TransactionsController {
         const operation = await this.operationRepository.get(request.operationId);
         if (!operation) {
             // transaction must be built before
-            throw new BlockchainError({ status: 400, message: `Unknown operation [${request.operationId}]` });
+            throw new BlockchainError(400, `Unknown operation [${request.operationId}]`);
         } else if (!!operation.FailTime) {
             // in case of error between broadcasting transaction and saving operation state
             // operation may be already processed by tracking job
-            throw new BlockchainError({ status: 400, message: operation.Error, errorCode: operation.ErrorCode });
+            throw new BlockchainError(400, operation.Error, operation.ErrorCode);
         } else if (!!operation.SendTime || !!operation.CompletionTime) {
-            throw new BlockchainError({ status: 409, message: `Operation [${request.operationId}] already ${this.getState(operation)}` });
+            throw new BlockchainError(409, `Operation [${request.operationId}] already ${this.getState(operation)}`);
         }
 
         const sendTime = new Date();
@@ -334,7 +334,7 @@ export class TransactionsController {
                 await this.steemService.send(tx);
             } catch (error) {
                 if (!!error.data && error.data.code == 4030100) {
-                    throw new BlockchainError({ status: 400, message: "Transaction rejected", errorCode: ErrorCode.buildingShouldBeRepeated, data: error.data });
+                    throw new BlockchainError(400, "Transaction rejected", ErrorCode.buildingShouldBeRepeated, error.data);
                 } else {
                     throw error;
                 }

@@ -21,7 +21,7 @@ export class BalancesController {
         @QueryParam("continuation") continuation?: string) {
 
         if (!this.balanceRepository.validateContinuation(continuation)) {
-            throw new BlockchainError({ status: 400, message: "Query parameter [continuation] is invalid" });
+            throw new BlockchainError(400, "Query parameter [continuation] is invalid");
         }
 
         const block = (await this.steemService.getLastIrreversibleBlockNumber()) * 10;
@@ -64,7 +64,7 @@ export class BalancesController {
 
         const asset = await this.assetRepository.get(assetId);
         if (asset == null) {
-            throw new BlockchainError({ status: 400, message: `Unknown assetId [${assetId}]` });
+            throw new BlockchainError(400, `Unknown assetId [${assetId}]`);
         }
 
         const block = await this.steemService.getLastIrreversibleBlockNumber();

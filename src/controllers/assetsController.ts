@@ -30,7 +30,7 @@ export class AssetsController {
         @QueryParam("continuation") continuation: string) {
 
         if (!this.assetRepository.validateContinuation(continuation)) {
-            throw new BlockchainError({ status: 400, message: "Query parameter [continuation] is invalid" });
+            throw new BlockchainError(400, "Query parameter [continuation] is invalid");
         }
 
         const query = await this.assetRepository.get(take, continuation);
