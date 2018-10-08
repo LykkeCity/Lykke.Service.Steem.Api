@@ -50,7 +50,7 @@ export class SteemService {
     async config(): Promise<Config> {
         // get server values
         const globals = await steem.api.getConfigAsync();
-        const version = await steem.api.callAsync("database_api.get_version", []);
+        const version = await steem.api.callAsync("database_api.get_version", {});
         const config: any = {
             address_prefix: globals["STEEM_ADDRESS_PREFIX"],
             chain_id: version.chain_id
@@ -107,7 +107,7 @@ export class SteemService {
             throw new Error(`Account [${account}] already exists`);
         }
 
-        const password = accountPassword || steem.createSuggestedPassword();
+        const password = accountPassword || steem.formatter.createSuggestedPassword();
         const keys = steem.auth.getPrivateKeys(account, password, ['owner', 'active', 'posting', 'memo']);
         const result = await steem.broadcast.accountCreateAsync(creatorActivePrivateKey,
             fee || `0.000 ${accounts[0].balance.split(" ")[1]}`,

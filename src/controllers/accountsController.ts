@@ -45,7 +45,7 @@ export class AddressesController {
     constructor(private steemService: SteemService) {
     }
 
-    @Get("/create")
+    @Post("/create")
     async create(@Body() request: CreateRequest) {
         if (await this.steemService.accountExists(request.account)) {
             throw new BlockchainError(409, `Account [${request.account}] already exists`);
