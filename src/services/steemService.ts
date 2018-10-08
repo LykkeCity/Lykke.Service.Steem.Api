@@ -19,10 +19,13 @@ export interface SignedTransaction extends Transaction {
 export interface Config {
     address_prefix: string;
     chain_id: string;
+    [key: string]: any;
 }
 
 @Service()
 export class SteemService {
+
+    private _config: Config;
 
     constructor(private settings: Settings) {
         steem.api.setOptions({
@@ -48,20 +51,22 @@ export class SteemService {
     }
 
     async config(): Promise<Config> {
-        // get server values
-        const globals = await steem.api.getConfigAsync();
-        const version = await steem.api.callAsync("database_api.get_version", {});
-        const config: any = {
-            address_prefix: globals["STEEM_ADDRESS_PREFIX"],
-            chain_id: version.chain_id
-        };
+        if (!this._config) {
+            // get server values
+            const globals = await steem.api.getConfigAsync();
+            const version = await steem.api.callAsync("database_api.get_version", {});
+            this._config = {
+                address_prefix: globals["STEEM_ADDRESS_PREFIX"],
+                chain_id: version.chain_id
+            };
 
-        // configure client library
-        for (const k in config) {
-            steem.config.set(k, config[k]);
+            // configure client library
+            for (const key in this._config) {
+                steem.config.set(key, this._config[key]);
+            }
         }
 
-        return config;
+        return this._config;
     }
 
     async getLastIrreversibleBlockNumber(): Promise<number> {
@@ -99,18 +104,19 @@ export class SteemService {
         return steem.auth.getPrivateKeys(name, password, ['owner', 'active', 'posting', 'memo']);
     }
 
-    async accountCreate(creator: string, creatorActivePrivateKey: string, account: string, accountPassword?: string, fee?: string) {
+    async accountCreate(creator: string, creatorActivePrivateKey: string, account: string, accountPassword?: string, fee?: string, ) {
         await this.config();
 
         const accounts = await steem.api.getAccountsAsync([creator, account]);
-        if (accounts.lenght > 1) {
+        if (accounts.length > 1) {
             throw new Error(`Account [${account}] already exists`);
         }
 
+        const symbol = accounts[0].balance.split(" ")[1];
         const password = accountPassword || steem.formatter.createSuggestedPassword();
         const keys = steem.auth.getPrivateKeys(account, password, ['owner', 'active', 'posting', 'memo']);
         const result = await steem.broadcast.accountCreateAsync(creatorActivePrivateKey,
-            fee || `0.000 ${accounts[0].balance.split(" ")[1]}`,
+            fee || `0.000 ${symbol}`,
             creator,
             account,
             { weight_threshold: 1, account_auths: [], key_auths: [[keys.ownerPubkey, 1]] },
@@ -124,6 +130,21 @@ export class SteemService {
             keys,
             result
         };
+    }
+
+    async delegateVestingShares(delegator: string, delegatorActivePrivateKey: string, delegatee: string, vestingShares: number) {
+        await this.config();
+        return await steem.broadcast.delegateVestingSharesAsync(delegatorActivePrivateKey, delegator, delegatee, `${vestingShares.toFixed(6)} VESTS`);
+    }
+
+    async transferToVesting(from: string, fromActivePrivateKey: string, to: string, amount: number) {
+        await this.config();
+        const accounts = await steem.api.getAccountsAsync([from, to]);
+        if (accounts.length != 2) {
+            throw new Error(`Wrong accounts`);
+        }
+        const symbol = accounts[0].balance.split(" ")[1];
+        return await steem.broadcast.transferToVestingAsync(fromActivePrivateKey, from, to, `${amount.toFixed(3)} ${symbol}`);
     }
 
     getTransactionId(tx: Transaction): string {

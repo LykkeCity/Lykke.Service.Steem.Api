@@ -1,7 +1,7 @@
-import { JsonController, Get, Post, Body } from "routing-controllers";
+import { JsonController, Post, Body } from "routing-controllers";
 import { IsSteemAddress } from "../common";
 import { SteemService } from "../services/steemService";
-import { IsString, IsOptional, IsNotEmpty } from "class-validator";
+import { IsString, IsOptional, IsNotEmpty, IsNumber } from "class-validator";
 import { BlockchainError } from "../errors/blockchainError";
 
 class CreateRequest {
@@ -28,6 +28,46 @@ class CreateRequest {
     fee: string;
 }
 
+class DelegateVestingSharesRequest {
+    @IsNotEmpty()
+    @IsString()
+    @IsSteemAddress()
+    delegator: string;
+
+    @IsNotEmpty()
+    @IsString()
+    delegatorActivePrivateKey: string;
+
+    @IsNotEmpty()
+    @IsString()
+    @IsSteemAddress()
+    delegatee: string;
+
+    @IsNotEmpty()
+    @IsNumber()
+    vestingShares: number;
+}
+
+class TransferToVestingRequest {
+    @IsNotEmpty()
+    @IsString()
+    @IsSteemAddress()
+    from: string;
+
+    @IsNotEmpty()
+    @IsString()
+    fromActivePrivateKey: string;
+
+    @IsNotEmpty()
+    @IsString()
+    @IsSteemAddress()
+    to: string;
+
+    @IsNotEmpty()
+    @IsNumber()
+    amount: number;
+}
+
 class GenerateKeysRequest {
     @IsNotEmpty()
     @IsString()
@@ -51,12 +91,34 @@ export class AddressesController {
             throw new BlockchainError(409, `Account [${request.account}] already exists`);
         }
 
-        return await this.steemService.accountCreate(request.creator,
-            request.creatorActivePrivateKey, request.account, request.accountPassword, request.fee);
+        return await this.steemService.accountCreate(
+            request.creator, 
+            request.creatorActivePrivateKey,
+            request.account,
+            request.accountPassword,
+            request.fee);
+    }
+
+    @Post("/delegateVestingShares")
+    async delegateVestingShares(@Body() request: DelegateVestingSharesRequest) {
+        return await this.steemService.delegateVestingShares(
+            request.delegator, 
+            request.delegatorActivePrivateKey,
+            request.delegatee,
+            request.vestingShares);
     }
 
     @Post("/generateKeys")
-    async keys(@Body() request: GenerateKeysRequest) {
+    async generateKeys(@Body() request: GenerateKeysRequest) {
         return await this.steemService.generateKeys(request.name, request.password);
+    }
+
+    @Post("/transferToVesting")
+    async transferToVesting(@Body() request: TransferToVestingRequest) {
+        return await this.steemService.transferToVesting(
+            request.from,
+            request.fromActivePrivateKey,
+            request.to,
+            request.amount);
     }
 }
