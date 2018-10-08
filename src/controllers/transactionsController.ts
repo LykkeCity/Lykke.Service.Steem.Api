@@ -129,11 +129,6 @@ interface SignedTransactionModel extends SignedTransaction {
     txId: string;
 }
 
-class KeysParameters {
-    username: string;
-    password: string;
-}
-
 @JsonController("/transactions")
 export class TransactionsController {
 
@@ -216,7 +211,7 @@ export class TransactionsController {
         }
 
         const context = {
-            config: await this.steemService.getConfig(),
+            config: await this.steemService.config(),
             tx: !!txActions.length && await this.steemService.prepareTransaction(txActions)
         };
 
@@ -463,10 +458,5 @@ export class TransactionsController {
     @OnUndefined(200)
     async deleteToObservation(@ParamIsSteemAddress("address") address: string) {
         // always OK due to controlling transaction tracking by node's configuration
-    }
-
-    @Post("/generateKeys")
-    async keys(@Body() params: KeysParameters) {
-        return await this.steemService.generateKeys(params.username, params.password);
     }
 }

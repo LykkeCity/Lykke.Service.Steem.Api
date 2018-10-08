@@ -27,7 +27,7 @@ export class SteemService {
     constructor(private settings: Settings) {
         steem.api.setOptions({
             url: settings.SteemApi.Steem.Url,
-            useAppbaseApi: settings.SteemApi.Steem.UseAppbaseApi
+            useAppbaseApi: true
         });
         
     }
@@ -47,12 +47,21 @@ export class SteemService {
         return !!accounts && !!accounts.length;
     }
 
-    async getConfig(): Promise<Config> {
-        const config = await steem.api.getConfigAsync();
-        return {
-            address_prefix: config["STEEM_ADDRESS_PREFIX"] || config["STEEMIT_ADDRESS_PREFIX"],
-            chain_id: config["STEEM_CHAIN_ID"] || config["STEEMIT_CHAIN_ID"]
+    async config(): Promise<Config> {
+        // get server values
+        const globals = await steem.api.getConfigAsync();
+        const version = await steem.api.callAsync("database_api.get_version", []);
+        const config: any = {
+            address_prefix: globals["STEEM_ADDRESS_PREFIX"],
+            chain_id: version.chain_id
         };
+
+        // configure client library
+        for (const k in config) {
+            steem.config.set(k, config[k]);
+        }
+
+        return config;
     }
 
     async getLastIrreversibleBlockNumber(): Promise<number> {
@@ -86,10 +95,35 @@ export class SteemService {
     }
 
     async generateKeys(name: string, password: string) {
-        const config = await this.getConfig();
-        steem.config.set('address_prefix', config.address_prefix);
-        steem.config.set('chain_id', config.chain_id);
+        await this.config();
         return steem.auth.getPrivateKeys(name, password, ['owner', 'active', 'posting', 'memo']);
+    }
+
+    async accountCreate(creator: string, creatorActivePrivateKey: string, account: string, accountPassword?: string, fee?: string) {
+        await this.config();
+
+        const accounts = await steem.api.getAccountsAsync([creator, account]);
+        if (accounts.lenght > 1) {
+            throw new Error(`Account [${account}] already exists`);
+        }
+
+        const password = accountPassword || steem.createSuggestedPassword();
+        const keys = steem.auth.getPrivateKeys(account, password, ['owner', 'active', 'posting', 'memo']);
+        const result = await steem.broadcast.accountCreateAsync(creatorActivePrivateKey,
+            fee || `0.000 ${accounts[0].balance.split(" ")[1]}`,
+            creator,
+            account,
+            { weight_threshold: 1, account_auths: [], key_auths: [[keys.ownerPubkey, 1]] },
+            { weight_threshold: 1, account_auths: [], key_auths: [[keys.activePubkey, 1]] },
+            { weight_threshold: 1, account_auths: [], key_auths: [[keys.postingPubkey, 1]] },
+            keys.memoPubkey,
+            "");
+        
+        return {
+            password,
+            keys,
+            result
+        };
     }
 
     getTransactionId(tx: Transaction): string {

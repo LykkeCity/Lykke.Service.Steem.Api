@@ -62,7 +62,6 @@ export class Settings {
         Steem: {
             ExpireInSeconds: number;
             Url: string;
-            UseAppbaseApi: boolean;
         }
     };
 }
