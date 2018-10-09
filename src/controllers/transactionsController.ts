@@ -328,7 +328,7 @@ export class TransactionsController {
             try {
                 await this.steemService.send(tx);
             } catch (error) {
-                if (!!error.data && error.data.code == 4030100) {
+                if (!!error.data && (error.data.code == 4030100 || error.data.code == 4100000)) {
                     throw new BlockchainError(400, "Transaction rejected", ErrorCode.buildingShouldBeRepeated, error.data);
                 } else {
                     throw error;
