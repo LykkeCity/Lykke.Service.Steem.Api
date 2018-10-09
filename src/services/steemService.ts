@@ -1,5 +1,6 @@
 import { Service } from "typedi";
 import { Settings } from "../common";
+import retry from "async-retry";
 
 const steem = require("steem");
 steem.serializer = require("steem/lib/auth/serializer");
@@ -27,6 +28,22 @@ export class SteemService {
 
     private _config: Config;
 
+    private async retry<T>(func: () => Promise<T>): Promise<T> {
+        return await retry(async (bail) => {
+            try {
+                return await func();
+            } catch (err) {
+                if ((err.message != "Unable to acquire database lock") &&                       // common steemd error
+                    (err.message != "Unknown exception") &&                                     // rare steemd error
+                    (err.message != "Internal Error" || err.code != -32603) &&                  // generic jussi error
+                    (err.message != "Bad or missing upstream response" || err.code != 1100)) {  // jussi timeout error
+                    bail(err);
+                    return;
+                }
+            }
+        }, {});
+    }
+
     constructor(private settings: Settings) {
         steem.api.setOptions({
             url: settings.SteemApi.Steem.Url,
@@ -36,7 +53,7 @@ export class SteemService {
     }
 
     async prepareTransaction(operations: (string | object)[][]): Promise<Transaction> {
-        const trx = await steem.broadcast._prepareTransaction({ operations });
+        const trx = await this.retry<any>(() => steem.broadcast._prepareTransaction({ operations }));
 
         if (this.settings.SteemApi.Steem.ExpireInSeconds > 0) {
             trx.expiration = new Date(Date.now() + this.settings.SteemApi.Steem.ExpireInSeconds * 1000).toISOString().slice(0, -5);
@@ -46,15 +63,14 @@ export class SteemService {
     }
 
     async accountExists(account: string): Promise<boolean> {
-        const accounts = await steem.api.getAccountsAsync([account]);
-        return !!accounts && !!accounts.length;
+        return !!(await this.getAccounts(account)).length;
     }
 
     async config(): Promise<Config> {
         if (!this._config) {
             // get server values
-            const globals = await steem.api.getConfigAsync();
-            const version = await steem.api.callAsync("database_api.get_version", {});
+            const globals = await this.retry<any>(() => steem.api.getConfigAsync());
+            const version = await this.retry<any>(() => steem.api.callAsync("database_api.get_version", {}));
             this._config = {
                 address_prefix: globals["STEEM_ADDRESS_PREFIX"],
                 chain_id: version.chain_id
@@ -69,13 +85,17 @@ export class SteemService {
         return this._config;
     }
 
+    async getAccounts(...names: string[]): Promise<any[]> {
+        return await this.retry<any[]>(() => steem.api.getAccountsAsync(names));
+    }
+
     async getLastIrreversibleBlockNumber(): Promise<number> {
-        return (await steem.api.getDynamicGlobalPropertiesAsync()).last_irreversible_block_num;
+        return (await this.retry<any>(() => steem.api.getDynamicGlobalPropertiesAsync())).last_irreversible_block_num;
     }
 
     async getBalance(account: string, assetId: string): Promise<number> {
         const parseAmount = (asset: string) => parseFloat(asset.split(" ")[0]) || 0;
-        const accounts = await steem.api.getAccountsAsync([account]);
+        const accounts = await this.getAccounts(account);
 
         if (!!accounts && !!accounts.length) {
             switch (assetId) {
@@ -107,7 +127,7 @@ export class SteemService {
     async accountCreate(creator: string, creatorActivePrivateKey: string, account: string, accountPassword?: string, fee?: string, ) {
         await this.config();
 
-        const accounts = await steem.api.getAccountsAsync([creator, account]);
+        const accounts = await this.getAccounts(creator, account);
         if (accounts.length > 1) {
             throw new Error(`Account [${account}] already exists`);
         }
@@ -115,7 +135,8 @@ export class SteemService {
         const symbol = accounts[0].balance.split(" ")[1];
         const password = accountPassword || steem.formatter.createSuggestedPassword();
         const keys = steem.auth.getPrivateKeys(account, password, ['owner', 'active', 'posting', 'memo']);
-        const result = await steem.broadcast.accountCreateAsync(creatorActivePrivateKey,
+        const result = await steem.broadcast.accountCreateAsync(
+            creatorActivePrivateKey,
             fee || `0.000 ${symbol}`,
             creator,
             account,
@@ -139,7 +160,7 @@ export class SteemService {
 
     async transferToVesting(from: string, fromActivePrivateKey: string, to: string, amount: number) {
         await this.config();
-        const accounts = await steem.api.getAccountsAsync([from, to]);
+        const accounts = await this.getAccounts(from, to);
         if (accounts.length != 2) {
             throw new Error(`Wrong accounts`);
         }
