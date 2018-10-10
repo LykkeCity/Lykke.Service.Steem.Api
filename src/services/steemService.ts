@@ -35,14 +35,14 @@ export class SteemService {
             } catch (err) {
                 if ((err.message == "Unable to acquire database lock") ||                       // common steemd error
                     (err.message == "Unknown exception") ||                                     // rare steemd error
-                    (err.message == "Internal Error" || err.code == -32603) ||                  // generic jussi error
+                    (err.message == "Internal Error" && err.code == -32603) ||                  // generic jussi error
                     (err.message == "Bad or missing upstream response" && err.code == 1100)) {  // jussi timeout error
                     throw err; // retry
                 } else {
                     bail(err); // break
                 }
             }
-        }, { factor: 1 });
+        }, { factor: 1.5 });
     }
 
     constructor(private settings: Settings) {
