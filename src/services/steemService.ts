@@ -42,7 +42,7 @@ export class SteemService {
                     bail(err); // break
                 }
             }
-        }, {});
+        }, { factor: 1 });
     }
 
     constructor(private settings: Settings) {
