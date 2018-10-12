@@ -128,17 +128,23 @@ export class SteemService {
     async accountCreate(creator: string, creatorActivePrivateKey: string, account: string, accountPassword?: string, fee?: string, ) {
         await this.config();
 
-        const accounts = await this.getAccounts(creator, account);
-        if (accounts.length > 1) {
-            throw new Error(`Account [${account}] already exists`);
+        if (!fee) {
+            const chainProperties = await this.retry<any>(() => steem.api.getChainPropertiesAsync());
+            if (!!chainProperties) {
+                fee = chainProperties.account_creation_fee;
+            }
+        }
+        if (!fee) {
+            const creatorAccount = (await this.getAccounts(creator))[0];
+            const symbol = creatorAccount.balance.split(" ")[1];
+            fee = `0.000 ${symbol}`
         }
 
-        const symbol = accounts[0].balance.split(" ")[1];
         const password = accountPassword || steem.formatter.createSuggestedPassword();
         const keys = steem.auth.getPrivateKeys(account, password, ['owner', 'active', 'posting', 'memo']);
         const result = await steem.broadcast.accountCreateAsync(
             creatorActivePrivateKey,
-            fee || `0.000 ${symbol}`,
+            fee,
             creator,
             account,
             { weight_threshold: 1, account_auths: [], key_auths: [[keys.ownerPubkey, 1]] },
