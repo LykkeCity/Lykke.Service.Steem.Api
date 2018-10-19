@@ -42,7 +42,10 @@ export class SteemService {
                     bail(err); // break
                 }
             }
-        }, { factor: 1.5 });
+        }, {
+            minTimeout: 1000,
+            factor: 1.5,
+        });
     }
 
     constructor(private settings: Settings) {
@@ -50,7 +53,6 @@ export class SteemService {
             url: settings.SteemApi.Steem.Url,
             useAppbaseApi: true
         });
-        
     }
 
     async prepareTransaction(operations: (string | object)[][]): Promise<Transaction> {
@@ -65,6 +67,30 @@ export class SteemService {
 
     async accountExists(account: string): Promise<boolean> {
         return !!(await this.getAccounts(account)).length;
+    }
+
+    async accountCreate(creator: string, creatorActivePrivateKey: string, newAccountName: string, newAccountPassword?: string) {
+        await this.config();
+
+        const password = newAccountPassword || steem.formatter.createSuggestedPassword();
+        const keys = steem.auth.getPrivateKeys(newAccountName, password, ['owner', 'active', 'posting', 'memo']);
+        const chainProperties = await this.retry<any>(() => steem.api.getChainPropertiesAsync());
+        const result = await steem.broadcast.accountCreateAsync(
+            creatorActivePrivateKey,
+            chainProperties.account_creation_fee,
+            creator,
+            newAccountName,
+            { weight_threshold: 1, account_auths: [], key_auths: [[keys.ownerPubkey, 1]] },
+            { weight_threshold: 1, account_auths: [], key_auths: [[keys.activePubkey, 1]] },
+            { weight_threshold: 1, account_auths: [], key_auths: [[keys.postingPubkey, 1]] },
+            keys.memoPubkey,
+            "");
+
+        return {
+            password,
+            keys,
+            result
+        };
     }
 
     async config(): Promise<Config> {
@@ -120,59 +146,24 @@ export class SteemService {
         await steem.api.broadcastTransactionAsync(tx);
     }
 
-    async generateKeys(name: string, password: string) {
-        await this.config();
-        return steem.auth.getPrivateKeys(name, password, ['owner', 'active', 'posting', 'memo']);
+    generateKeys(account: string, password: string): Promise<any> {
+        return this.config()
+            .then(_ => steem.auth.getPrivateKeys(account, password, ['owner', 'active', 'posting', 'memo']));
     }
 
-    async accountCreate(creator: string, creatorActivePrivateKey: string, account: string, accountPassword?: string, fee?: string, ) {
-        await this.config();
-
-        if (!fee) {
-            const chainProperties = await this.retry<any>(() => steem.api.getChainPropertiesAsync());
-            if (!!chainProperties) {
-                fee = chainProperties.account_creation_fee;
-            }
-        }
-        if (!fee) {
-            const creatorAccount = (await this.getAccounts(creator))[0];
-            const symbol = creatorAccount.balance.split(" ")[1];
-            fee = `0.000 ${symbol}`
-        }
-
-        const password = accountPassword || steem.formatter.createSuggestedPassword();
-        const keys = steem.auth.getPrivateKeys(account, password, ['owner', 'active', 'posting', 'memo']);
-        const result = await steem.broadcast.accountCreateAsync(
-            creatorActivePrivateKey,
-            fee,
-            creator,
-            account,
-            { weight_threshold: 1, account_auths: [], key_auths: [[keys.ownerPubkey, 1]] },
-            { weight_threshold: 1, account_auths: [], key_auths: [[keys.activePubkey, 1]] },
-            { weight_threshold: 1, account_auths: [], key_auths: [[keys.postingPubkey, 1]] },
-            keys.memoPubkey,
-            "");
-        
-        return {
-            password,
-            keys,
-            result
-        };
+    delegateVestingShares(delegator: string, delegatorActivePrivateKey: string, delegatee: string, amountInVests: number): Promise<any> {
+        return this.config()
+            .then(_ => steem.broadcast.delegateVestingSharesAsync(delegatorActivePrivateKey, delegator, delegatee, `${amountInVests.toFixed(6)} VESTS`));
     }
 
-    async delegateVestingShares(delegator: string, delegatorActivePrivateKey: string, delegatee: string, vestingShares: number) {
-        await this.config();
-        return await steem.broadcast.delegateVestingSharesAsync(delegatorActivePrivateKey, delegator, delegatee, `${vestingShares.toFixed(6)} VESTS`);
+    transferToVesting(from: string, fromActivePrivateKey: string, to: string, amountInSteem: number): Promise<any> {
+        return this.config()
+            .then(_ => steem.broadcast.transferToVestingAsync(fromActivePrivateKey, from, to, `${amountInSteem.toFixed(3)} STEEM`));
     }
 
-    async transferToVesting(from: string, fromActivePrivateKey: string, to: string, amount: number) {
-        await this.config();
-        const accounts = await this.getAccounts(from, to);
-        if (accounts.length != 2) {
-            throw new Error(`Wrong accounts`);
-        }
-        const symbol = accounts[0].balance.split(" ")[1];
-        return await steem.broadcast.transferToVestingAsync(fromActivePrivateKey, from, to, `${amount.toFixed(3)} ${symbol}`);
+    withdrawVesting(account: string, accountActivePrivateKey: string, amountInVests: number): Promise<any> {
+        return this.config()
+            .then(_ => steem.broadcast.withdrawVestingAsync(accountActivePrivateKey, account, `${amountInVests.toFixed(6)} VESTS`));
     }
 
     getTransactionId(tx: Transaction): string {

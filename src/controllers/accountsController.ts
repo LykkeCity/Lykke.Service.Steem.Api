@@ -1,4 +1,4 @@
-import { JsonController, Post, Body } from "routing-controllers";
+import { JsonController, Post, Body, HttpError } from "routing-controllers";
 import { IsSteemAddress } from "../common";
 import { SteemService } from "../services/steemService";
 import { IsString, IsOptional, IsNotEmpty, IsNumber } from "class-validator";
@@ -17,15 +17,11 @@ class CreateRequest {
     @IsNotEmpty()
     @IsString()
     @IsSteemAddress()        
-    account: string;
+    newAccountName: string;
 
     @IsOptional()
     @IsString()
-    accountPassword: string;
-
-    @IsOptional()
-    @IsString()
-    fee: string;
+    newAccountPassword: string;
 }
 
 class DelegateVestingSharesRequest {
@@ -45,7 +41,7 @@ class DelegateVestingSharesRequest {
 
     @IsNotEmpty()
     @IsNumber()
-    vestingShares: number;
+    amountInVests: number;
 }
 
 class TransferToVestingRequest {
@@ -65,18 +61,33 @@ class TransferToVestingRequest {
 
     @IsNotEmpty()
     @IsNumber()
-    amount: number;
+    amountInSteem: number;
+}
+
+class WithdrawVestingRequest {
+    @IsNotEmpty()
+    @IsString()
+    @IsSteemAddress()
+    account: string;
+
+    @IsNotEmpty()
+    @IsString()
+    accountActivePrivateKey: string;
+
+    @IsNotEmpty()
+    @IsNumber()
+    amountInVests: number;
 }
 
 class GenerateKeysRequest {
     @IsNotEmpty()
     @IsString()
     @IsSteemAddress()
-    name: string;
+    account: string;
 
     @IsNotEmpty()
     @IsString()
-    password: string;
+    accountPassword: string;
 }
 
 @JsonController("/accounts")
@@ -87,30 +98,29 @@ export class AddressesController {
 
     @Post("/create")
     async create(@Body() request: CreateRequest) {
-        if (await this.steemService.accountExists(request.account)) {
-            throw new BlockchainError(409, `Account [${request.account}] already exists`);
+        if (await this.steemService.accountExists(request.newAccountName)) {
+            throw new HttpError(409, `Account ${request.newAccountName} already exists`);
         }
 
         return await this.steemService.accountCreate(
-            request.creator, 
+            request.creator,
             request.creatorActivePrivateKey,
-            request.account,
-            request.accountPassword,
-            request.fee);
+            request.newAccountName,
+            request.newAccountPassword);
+    }
+
+    @Post("/generateKeys")
+    async generateKeys(@Body() request: GenerateKeysRequest) {
+        return await this.steemService.generateKeys(request.account, request.accountPassword);
     }
 
     @Post("/delegateVestingShares")
     async delegateVestingShares(@Body() request: DelegateVestingSharesRequest) {
         return await this.steemService.delegateVestingShares(
-            request.delegator, 
+            request.delegator,
             request.delegatorActivePrivateKey,
             request.delegatee,
-            request.vestingShares);
-    }
-
-    @Post("/generateKeys")
-    async generateKeys(@Body() request: GenerateKeysRequest) {
-        return await this.steemService.generateKeys(request.name, request.password);
+            request.amountInVests);
     }
 
     @Post("/transferToVesting")
@@ -119,6 +129,14 @@ export class AddressesController {
             request.from,
             request.fromActivePrivateKey,
             request.to,
-            request.amount);
+            request.amountInSteem);
+    }
+
+    @Post("/withdrawVesting")
+    async withdrawVesting(@Body() request: WithdrawVestingRequest) {
+        return await this.steemService.withdrawVesting(
+            request.account,
+            request.accountActivePrivateKey,
+            request.amountInVests);
     }
 }

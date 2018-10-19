@@ -289,6 +289,18 @@ export class TransactionsController {
         const tx = fromBase64<SignedTransactionModel>(request.signedTransaction);
         const txId = tx.txId || this.steemService.getTransactionId(tx);
 
+        // prevent tx hash duplication issues
+        const operationIdByTxId = await this.operationRepository.getOperationIdByTxId(txId);
+        if (!!operationIdByTxId && operationIdByTxId != operation.OperationId) {
+            const message = "Duplicated transaction hash";
+            await this.logService.write(LogLevel.warning, TransactionsController.name, this.broadcast.name, message, txId);
+            await this.operationRepository.update(operation.OperationId, { blockchainError: message });
+            throw new BlockchainError(400, message, ErrorCode.buildingShouldBeRepeated, {
+                operationIdByTxId,
+                operation
+            });
+        }
+
         // connect operation to transaction before broadcasting to process transaction
         // correctly in case of errors between broadcasting and saving operation state 
         await this.operationRepository.update(operation.OperationId, { txId });
@@ -328,6 +340,9 @@ export class TransactionsController {
             try {
                 await this.steemService.send(tx);
             } catch (error) {
+                await this.logService.write(LogLevel.warning, TransactionsController.name, this.broadcast.name, "BlockchainError", error.message);
+                await this.operationRepository.update(operation.OperationId, { blockchainError: error.message });
+
                 if (!!error.data && error.data.code == 4030100) {
                     throw new BlockchainError(400, "Transaction rejected", ErrorCode.buildingShouldBeRepeated, error.data);
                 } else {
@@ -355,7 +370,8 @@ export class TransactionsController {
                 hash: operation.TxId,
                 block: operation.Block,
                 error: operation.Error,
-                errorCode: operation.ErrorCode
+                errorCode: operation.ErrorCode,
+                blockchainError: operation.BlockchainError
             };
         } else {
             return null;
@@ -379,7 +395,8 @@ export class TransactionsController {
                 hash: operation.TxId,
                 block: operation.Block,
                 error: operation.Error,
-                errorCode: operation.ErrorCode
+                errorCode: operation.ErrorCode,
+                blockchainError: operation.BlockchainError
             };
         } else {
             return null;
@@ -403,7 +420,8 @@ export class TransactionsController {
                 hash: operation.TxId,
                 block: operation.Block,
                 error: operation.Error,
-                errorCode: operation.ErrorCode
+                errorCode: operation.ErrorCode,
+                blockchainError: operation.BlockchainError
             };
         } else {
             return null;
