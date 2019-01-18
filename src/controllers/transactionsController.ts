@@ -345,6 +345,8 @@ export class TransactionsController {
 
                 if (!!error.data && error.data.code == 4030100) {
                     throw new BlockchainError(400, "Transaction rejected", ErrorCode.buildingShouldBeRepeated, error.data);
+                } else if (!!error.data && error.data.code == 4100000) {
+                    throw new BlockchainError(400, "Not enough RC", ErrorCode.notEnoughBalance, error.data);
                 } else {
                     throw error;
                 }
