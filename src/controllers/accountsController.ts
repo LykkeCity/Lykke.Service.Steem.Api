@@ -2,26 +2,28 @@ import { JsonController, Post, Body, HttpError } from "routing-controllers";
 import { IsSteemAddress } from "../common";
 import { SteemService } from "../services/steemService";
 import { IsString, IsOptional, IsNotEmpty, IsNumber } from "class-validator";
-import { BlockchainError } from "../errors/blockchainError";
 
 class CreateRequest {
     @IsNotEmpty()
     @IsString()
-    @IsSteemAddress()        
+    @IsSteemAddress()
     creator: string;
 
     @IsNotEmpty()
     @IsString()
     creatorActivePrivateKey: string;
-    
+
     @IsNotEmpty()
     @IsString()
-    @IsSteemAddress()        
+    @IsSteemAddress()
     newAccountName: string;
 
     @IsOptional()
     @IsString()
     newAccountPassword: string;
+
+    @IsOptional()
+    metadata: object;
 }
 
 class DelegateVestingSharesRequest {
@@ -106,7 +108,8 @@ export class AddressesController {
             request.creator,
             request.creatorActivePrivateKey,
             request.newAccountName,
-            request.newAccountPassword);
+            request.newAccountPassword,
+            request.metadata);
     }
 
     @Post("/generateKeys")
