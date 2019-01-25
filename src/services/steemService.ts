@@ -69,10 +69,10 @@ export class SteemService {
         return !!(await this.getAccounts(account)).length;
     }
 
-    async accountCreate(creator: string, creatorActivePrivateKey: string, newAccountName: string, newAccountPassword?: string) {
+    async accountCreate(creator: string, creatorActivePrivateKey: string, newAccountName: string, newAccountPassword?: string, metadata?: object) {
         await this.config();
 
-        const password = newAccountPassword || steem.formatter.createSuggestedPassword();
+        const password = newAccountPassword || ('P' + steem.ecc.key_utils.get_random_key().toWif());
         const keys = steem.auth.getPrivateKeys(newAccountName, password, ['owner', 'active', 'posting', 'memo']);
         const chainProperties = await this.retry<any>(() => steem.api.getChainPropertiesAsync());
         const result = await steem.broadcast.accountCreateAsync(
@@ -84,7 +84,7 @@ export class SteemService {
             { weight_threshold: 1, account_auths: [], key_auths: [[keys.activePubkey, 1]] },
             { weight_threshold: 1, account_auths: [], key_auths: [[keys.postingPubkey, 1]] },
             keys.memoPubkey,
-            "");
+            JSON.stringify(metadata || {}));
 
         return {
             password,

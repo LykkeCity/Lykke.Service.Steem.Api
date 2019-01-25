@@ -1,0 +1,9 @@
+# .net binaries
+
+bin
+obj
+
+# VS & VS Code
+
+.vs
+.vscode
