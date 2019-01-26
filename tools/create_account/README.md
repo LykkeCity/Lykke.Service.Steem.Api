@@ -1,10 +1,29 @@
+### Build
+
+To compile from sources use
+```
+dotnet build
+```
+or
+```
+dotnet publish
+```
+This will compile the project to the `bin/Debug/netcoreapp2.2` or `bin/Debug/netcoreapp2.2/publish` accordingly with `Debug` configuration and default settings.
+
 ### Usage
 
 Accepts 6 or 7 arguments. JSON metadata is optional.
 
+For compiled version use
 ```
-dotnet create_account.dll <api_url> <sign_facade_url> <sign_facade_api_key> <creator_account> <creator_account_active_private_key> <new_account_name> [<json_metadata>]
+dotnet <path_to_compiled>/create_account.dll <api_url> <sign_facade_url> <sign_facade_api_key> <creator_account> <creator_account_active_private_key> <new_account_name> [<json_metadata>]
 ```
+
+To build and run instantly use
+```
+dotnet run -- <...>
+```
+with arguments mentioned above.
 
 ### Example:
 
