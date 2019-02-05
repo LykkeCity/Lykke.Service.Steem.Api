@@ -287,7 +287,14 @@ export class TransactionsController {
         const blockTime = operation.BlockTime || sendTime;
         const completionTime = operation.CompletionTime || sendTime;
         const tx = fromBase64<SignedTransactionModel>(request.signedTransaction);
-        const txId = tx.txId || this.steemService.getTransactionId(tx);
+
+        // for now operation may be processed by multiple threads,
+        // if process is parallelized before signing then simulated transaction may be broadcasted
+        // multiple times with different hashes (due to using timestamp as transaction hash);
+        // to prevent double spending for simulated transactions we use operation ID instead of timestamp as transaction hash;
+        const txId = !tx.signatures
+            ? operation.OperationId.replace(/[{}-]/g, "")
+            : this.steemService.getTransactionId(tx);
 
         // prevent tx hash duplication issues
         const operationIdByTxId = await this.operationRepository.getOperationIdByTxId(txId);
@@ -305,7 +312,7 @@ export class TransactionsController {
         // correctly in case of errors between broadcasting and saving operation state 
         await this.operationRepository.update(operation.OperationId, { txId });
 
-        if (!!tx.txId) {
+        if (!tx.signatures) {
 
             // for fully simulated transaction we immediately update
             // balances and history, and mark operation as completed
